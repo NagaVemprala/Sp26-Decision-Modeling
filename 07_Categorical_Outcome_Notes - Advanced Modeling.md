@@ -1,0 +1,677 @@
+Predictive Analytics - Classification
+================
+Naga Vemprala
+2026-03-12
+
+## Classification - the target variable is categorical.
+
+## Predictive Analytics - Classification
+
+Predictive analytics in a classification context aims to predict a
+categorical outcome (e.g., “admitted” or “not admitted”) based on
+historical data. Unlike regression, which predicts continuous numbers,
+classification handles discrete classes.
+
+### Key Classification Concepts
+
+- **Logistic Regression**: The standard algorithm for binary
+  classification. It uses a “logit” link function to map predictors to a
+  probability between 0 and 1.
+
+- **The Decision Threshold**: Once the model provides a probability
+  (e.g., 0.65), we must choose a cutoff (threshold) to decide the final
+  class. A common default is 0.5, but this can be tuned based on the
+  cost of errors.
+
+- **Confusion Matrix**: A table used to evaluate performance by
+  comparing actual vs. predicted values, showing True Positives, False
+  Positives, etc.
+
+- **ROC Curve and AUC**:
+
+  - **ROC (Receiver Operating Characteristic)**: A plot of the True
+    Positive Rate vs. the False Positive Rate across various thresholds.
+  - **AUC (Area Under the Curve)**: A single metric (0 to 1)
+    representing model quality. An AUC of 1.0 is perfect, while 0.5 is
+    no better than random guessing.
+
+## Logistic Regression Overview
+
+Logistic regression is an effective tool for addressing binary
+classification problems, such as:
+
+- Predicting whether a specific stock’s value will appreciate during the
+  next trading cycle.
+- Determining if a student will be admitted to a university based on
+  standardized evaluation criteria.
+- Estimating the probability that an automotive company will launch a
+  new model within the next year.
+- Assessing whether a particular stock will issue a dividend payment
+  this year.
+
+In these scenarios, the outcome is discrete (e.g., “Yes” or “No”) rather
+than a continuous value. For instance, the annual percentage gain on a
+stock is a continuous metric and would require a standard linear
+regression rather than a logistic model.
+
+------------------------------------------------------------------------
+
+In logistic regression, the relationship between the predictors and the
+outcome is modeled using an exponential function.
+
+Let *p* represent the probability (likelihood) of a stock exhibiting
+bullish movement in the next trading cycle. Assume this movement is
+influenced by three primary factors: $X_1$, $X_2$, and $X_3$. Based on
+these factors, the model calculates a linear consensus score, *Y*,
+expressed as:
+
+$$Y = \beta_0 + \beta_1X_1 + \beta_2X_2 + \beta_3X_3$$
+
+However, since *Y* can range from $-\infty$ to $+\infty$, we cannot
+directly interpret it as a probability (which must be between 0 and 1).
+To convert this linear score into a probability, we use the **logistic
+(sigmoid) function**:
+
+$$p = \frac{1}{1 + e^{-Y}}$$
+
+This transformation ensures that: - When $Y$ is large and positive, $p$
+approaches 1. - When $Y$ is large and negative, $p$ approaches 0. - When
+$Y = 0$, $p = 0.5$, the decision boundary.
+
+The coefficients ($\beta$) are estimated using **maximum likelihood
+estimation (MLE)** rather than ordinary least squares, finding the
+values that make the observed data most probable.
+
+$$
+Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_2 X_3 
+$$
+
+- However, as the likelihood of investing depends on the probability
+  that the score the stock receives is sufficient enough, which can be
+  modeled as a sigmoid function between 0 and 1. The equation of sigmoid
+  function is:
+
+$$
+p = \frac{1}{1 + e^{-Y}} 
+$$
+
+#### Simulating a sigmoid function.
+
+``` r
+set.seed(1234)
+y <- rnorm(500, 0, 5)
+y <- sort(y)
+p <- 1/(1 + exp(-1*y))
+df <- data.frame(trial=seq(1,500), 
+                 y = y,
+                 probability = p)
+print(df[c(1:5, seq((nrow(df)-5), nrow(df))),])
+```
+
+    ##     trial         y  probability
+    ## 1       1 -16.98032 4.222228e-08
+    ## 2       2 -16.16576 9.534530e-08
+    ## 3       3 -14.27879 6.292143e-07
+    ## 4       4 -13.66110 1.166971e-06
+    ## 5       5 -13.64840 1.181882e-06
+    ## 495   495  11.36742 9.999884e-01
+    ## 496   496  12.07918 9.999943e-01
+    ## 497   497  12.74496 9.999971e-01
+    ## 498   498  14.59570 9.999995e-01
+    ## 499   499  15.21883 9.999998e-01
+    ## 500   500  15.97951 9.999999e-01
+
+``` r
+plot(x = seq(1,500), y = p, 
+     type="l", 
+     col = "blue",
+     xlab="X - Ranging from 1 to 500")
+```
+
+![](01_Predictive_Analytics_Classification_files/figure-gfm/sigmoid%20function-1.png)<!-- -->
+
+- The same equation can be re-written as: $$
+  e^Y = \frac{p}{1 - p} 
+  $$
+
+- Taking log on both the sides, we get: $$
+  Y = log(\frac{p}{1 - p}) 
+  $$
+
+Therefore, what we are going to model in the logistic regression is: $$
+Y = log(\frac{p}{1 - p}) = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_2 X_3 
+$$
+
+As a linear function of a set of predictive variables X, the above model
+calculates the probability of success for the outcome variable Y. By
+including exponential terms from the predictor variables in both the
+numerator and denominator, the ratio is always positive. In addition,
+when the exponential term is small, the ratio approaches zero. The ratio
+increases as the value of the exponential term increases. When the
+exponential term has a very large value, the ratio approaches one. By
+doing so, we ensure that the function accurately models that
+probability. The increase in log odds for a unit increase in X is
+represented by beta terms. Logistic regression is different from linear
+regression. The target variable is directly related to the predictor
+variables in linear regression. A logistic regression takes a
+probabilistic view of two binary variable outcomes and relates the log
+odds of one outcome to a linear function of the predictor variables.
+
+``` r
+admissions <- read.csv(paste0(getwd(),"/UCLA_Student_Admissions.csv"))
+summary(admissions)
+```
+
+    ##      admit             gre             gpa             rank      
+    ##  Min.   :0.0000   Min.   :220.0   Min.   :2.260   Min.   :1.000  
+    ##  1st Qu.:0.0000   1st Qu.:520.0   1st Qu.:3.130   1st Qu.:2.000  
+    ##  Median :0.0000   Median :580.0   Median :3.395   Median :2.000  
+    ##  Mean   :0.3175   Mean   :587.7   Mean   :3.390   Mean   :2.485  
+    ##  3rd Qu.:1.0000   3rd Qu.:660.0   3rd Qu.:3.670   3rd Qu.:3.000  
+    ##  Max.   :1.0000   Max.   :800.0   Max.   :4.000   Max.   :4.000
+
+- From the above summary statistics, we can confirm that there are no
+  missing values in any variable. There are 400 observations in the
+  dataset. The output variable admit (DV) is an integer value.
+
+The output variable has only two possibilities and the frequency can be
+displayed using the table function. To fit the logistic regression
+model, this output variable should be a numeric 0 and 1 variable for
+binary classification. If this is not the case, then the outcome
+variable should be converted to numeric.
+
+``` r
+table(admissions$admit)
+```
+
+    ## 
+    ##   0   1 
+    ## 273 127
+
+- Setting a seed to a constant value so that the results could be
+  reproducible (However, the reproducibility depends on the R version)
+
+``` r
+set.seed(1234)
+train_test_ind <- sample(c("for_fit", "for_test"), nrow(admissions), 
+                         replace = T, prob = c(0.80, 0.20))
+train <- admissions[train_test_ind == "for_fit",]
+test <- admissions[train_test_ind == "for_test",]
+```
+
+- Using the train dataset fit a logistic regression
+
+``` r
+cat_model_logit <- glm(admit ~., 
+                       data = train,
+                       family = "binomial")
+summary(cat_model_logit)
+```
+
+    ## 
+    ## Call:
+    ## glm(formula = admit ~ ., family = "binomial", data = train)
+    ## 
+    ## Coefficients:
+    ##              Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept) -4.511500   1.295752  -3.482 0.000498 ***
+    ## gre          0.001641   0.001215   1.351 0.176840    
+    ## gpa          1.161932   0.383170   3.032 0.002426 ** 
+    ## rank        -0.524750   0.141861  -3.699 0.000216 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## (Dispersion parameter for binomial family taken to be 1)
+    ## 
+    ##     Null deviance: 404.39  on 324  degrees of freedom
+    ## Residual deviance: 370.08  on 321  degrees of freedom
+    ## AIC: 378.08
+    ## 
+    ## Number of Fisher Scoring iterations: 3
+
+- Let’s pick a single variable, gpa, to understand the model
+  coefficients. gpa is significant at 0.01 alpha value and the
+  coefficient is 1.161932. It is difficult to understand the
+  coefficients in their absolute values.
+- Another variable, rank, has four possible values: 1, 2, 3, 4. But, as
+  it is a numeric field they are not captured as multiple level of
+  schools. It should be treated as a factor variable. Re-running the
+  analysis, updated coefficients are captured.
+
+``` r
+admissions$rank <- factor(admissions$rank)
+train <- admissions[train_test_ind == "for_fit",]
+test <- admissions[train_test_ind == "for_test",]
+cat_model_logit <- glm(admit ~., 
+                       data = train,
+                       family = "binomial")
+summary(cat_model_logit)
+```
+
+    ## 
+    ## Call:
+    ## glm(formula = admit ~ ., family = "binomial", data = train)
+    ## 
+    ## Coefficients:
+    ##              Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept) -5.009514   1.316514  -3.805 0.000142 ***
+    ## gre          0.001631   0.001217   1.340 0.180180    
+    ## gpa          1.166408   0.388899   2.999 0.002706 ** 
+    ## rank2       -0.570976   0.358273  -1.594 0.111005    
+    ## rank3       -1.125341   0.383372  -2.935 0.003331 ** 
+    ## rank4       -1.532942   0.477377  -3.211 0.001322 ** 
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## (Dispersion parameter for binomial family taken to be 1)
+    ## 
+    ##     Null deviance: 404.39  on 324  degrees of freedom
+    ## Residual deviance: 369.99  on 319  degrees of freedom
+    ## AIC: 381.99
+    ## 
+    ## Number of Fisher Scoring iterations: 4
+
+- Since those students coming from a high ranked school have higher
+  chances of getting admitted, we can hypothesize that the likelihood of
+  admission decreases from rank 1 schools to rank 4 schools.
+
+#### Looking at the coefficients:
+
+- rank2 -0.570976 0.358273 -1.594 0.111005  
+
+- rank3 -1.125341 0.383372 -2.935 0.003331 \*\*
+
+- rank4 -1.532942 0.477377 -3.211 0.001322 \*\*
+
+- Rank 1 school is taken as base.
+
+> All coefficients are negative and become progressively larger in
+> magnitude, indicating that, compared to rank 1, attending a school of
+> rank 2, 3, or 4 lowers the log‑odds of admission. The increasing size
+> of the coefficients from rank 2 to rank 4 reflects a monotonic
+> decrease in admission likelihood as school rank worsens.
+
+> The question of whether to reorder the categories often arises, but in
+> this case the current coding (with rank 1 as the baseline) is
+> perfectly interpretable: the coefficients directly show how each lower
+> rank reduces the log‑odds relative to the top rank. If a different
+> ordering were desired, one could relevel the factor, but it is not
+> necessary for a clear interpretation. Log‑odds provide a
+> straightforward way to quantify these effects.
+
+``` r
+log_odds <- exp(cat_model_logit$coefficients)
+log_odds
+```
+
+    ## (Intercept)         gre         gpa       rank2       rank3       rank4 
+    ## 0.006674146 1.001632616 3.210441592 0.564973638 0.324541827 0.215899505
+
+Interpret the outcome in terms of odds ratio is easy. If rank 1 is
+considered as base, then the chance of admission drops by a factor of
+0.57 for a student coming from rank 2 school.
+
+- Capture the accuracy on the test sample.
+- Use the fit model created using the train sameple for making
+  predictions on the test (validation) sample.
+
+``` r
+predict_test_outcome <- predict(cat_model_logit, 
+                                    test, 
+                                    type = "response")
+
+# The predicted outcome is between 0 and 1. If the value is greater than 0.5, it can be considered as 1
+predict_test_outcome <- ifelse(predict_test_outcome > 0.5, 1, 0)
+
+# Get the accuracy using the training sample 
+# First create a confusion matrix or contingency table 
+confusionMatrix <- table(test$admit, predict_test_outcome)
+confusionMatrix <- as.data.frame(confusionMatrix) 
+colnames(confusionMatrix) <- c("true_outcome", 
+                               "predicted_outcome", 
+                               "frequency")
+accuracy <- sum(confusionMatrix[
+  confusionMatrix$true_outcome == confusionMatrix$predicted_outcome, "frequency"]) /
+  sum(confusionMatrix$frequency)
+accuracy
+```
+
+    ## [1] 0.6933333
+
+- Finally, create a visual representation of the confusion matrix
+  (special type of contingency table)
+
+``` r
+library(ggplot2) 
+ggplot(data = confusionMatrix, mapping = aes(x = true_outcome, y = predicted_outcome)) + 
+  geom_tile(fill=c("green", "red", "red", "green")
+            ) +
+  geom_text(aes(label = frequency))
+```
+
+![](01_Predictive_Analytics_Classification_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+- Type I (Medical trials)
+- Type II
+
+False - Positive: 2 True Positives: 4 False Negatives: 21  
+True Negatives: 48
+
+Accuracy: (TP + TN) / Total Recall or Sensitivity: TP / (TP + FN)
+Specificity: TN / (TN + FP)
+
+``` r
+library(pROC)
+```
+
+    ## Type 'citation("pROC")' for a citation.
+
+    ## 
+    ## Attaching package: 'pROC'
+
+    ## The following objects are masked from 'package:stats':
+    ## 
+    ##     cov, smooth, var
+
+``` r
+predict_test_outcome <- predict(cat_model_logit, 
+                                    test, 
+                                    type = "response")
+
+roc_parameters <- multiclass.roc(test$admit, predict_test_outcome, percent = TRUE)
+```
+
+    ## Setting direction: controls < cases
+
+``` r
+roc <- roc_parameters[["rocs"]][[1]]
+plot.roc(roc)
+```
+
+![](01_Predictive_Analytics_Classification_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+
+``` r
+plot.roc(roc, 
+         print.auc = TRUE, 
+         grid = c(0.1, 0.1), 
+         auc.polygon = TRUE, 
+         print.thres = TRUE, 
+         auc.polygon.col = "lightgreen", 
+         max.auc.polygon = T,
+         grid.col = c("green", "red")
+         )
+```
+
+![](01_Predictive_Analytics_Classification_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+``` r
+### ?coords()
+coords(roc, "best", input="threshold")
+```
+
+    ##   threshold specificity sensitivity
+    ## 1 0.2949023          58          68
+    ## 2 0.3647070          78          48
+    ## 3 0.4249419          94          32
+
+## ROC Curve Analysis
+
+An **ROC (Receiver Operating Characteristic) curve** is a graph that
+illustrates the diagnostic ability of a binary classifier system. It
+helps us to visualize the trade-off between **Sensitivity** and
+**Specificity** as we change the “threshold” for what counts as a “Yes”
+(e.g., admitting a student or flagging a stock).
+
+### 1. Understanding the Axes
+
+- **Y-Axis: Sensitivity (True Positive Rate)**: This measures how good
+  the model is at catching the “Yes” cases. In your admissions example,
+  it is the percentage of students who were *actually* admitted that the
+  model correctly predicted would be admitted.
+- **X-Axis: Specificity (True Negative Rate)**: This measures how good
+  the model is at catching the “No” cases. Traditionally, the X-axis is
+  plotted as **1 - Specificity** (False Positive Rate), but many tools
+  (including the `pROC` library) allow us to view it as Specificity.
+
+### 2. Explaining the Points
+
+The “points” represented on the ROC curve tell us about the performance
+of our model at different probability thresholds. In our data, the
+coordinates are shown as **Threshold (Specificity %, Sensitivity %)**.
+Let’s look at how the model’s behavior shifts:
+
+| Threshold | Specificity | Sensitivity | Interpretation |
+|----|----|----|----|
+| 0.5 | 94.0% | 32.0% | **Strict Model**: At this high threshold, the model is very picky. It rarely falsely admits someone (high specificity), but it misses a lot of qualified candidates (low sensitivity). |
+| 0.4 | 78.0% | 48.0% | **Balanced Model**: As the threshold changes, the model starts catching more “Yes” cases (sensitivity rises), but it starts making more mistakes by admitting “No” cases (specificity drops). |
+| 0.3 | 58.0% | 68.0% | **Lenient Model**: By lowering the threshold to 0.3, you are “casting a wider net.” You catch most admitted students (68% sensitivity), but you are now incorrectly predicting “admit” for many who were actually rejected (specificity falls to 58%). |
+
+### 3. Why the Curve Matters
+
+- **The Area Under the Curve (AUC)**: If we connect all these possible
+  points, the area underneath that line is the AUC. An AUC of 0.774
+  (77.4%), as seen in the output, means that if we picked one random
+  admitted student and one random rejected student, the model would rank
+  the admitted student higher 77.4% of the time.
+
+- **The “Best” Point**: The code here uses `coords(roc, "best")`. This
+  mathematically finds the point on the curve that is closest to the
+  top-left corner—the “sweet spot” where we maximize both Sensitivity
+  and Specificity simultaneously.
+
+#### Cleaner way to implement logistic regression using tidymodels (Just same dish in new bowl :) )
+
+> **Note:** To broaden the scope of your predictive modeling skills,
+> exploring a variety of algorithms is essential. The **`tidymodels`**
+> framework is particularly powerful here because once you understand
+> the “recipe” and “workflow” structure, you can switch between these
+> complex models by changing only a few lines of code.
+
+> This flexibility allows us to efficiently compare different
+> approaches—from logistic regression to tree-based methods like random
+> forests or gradient boosting—without rewriting our entire data
+> preprocessing pipeline. You’ll see how the same steps for scaling
+> data, handling categorical variables, and cross-validation can be
+> seamlessly applied across multiple model types.
+
+``` r
+# 0. Load Required Libraries
+library(tidymodels)
+```
+
+    ## ── Attaching packages ────────────────────────────────────── tidymodels 1.4.1 ──
+
+    ## ✔ broom        1.0.12     ✔ rsample      1.3.2 
+    ## ✔ dials        1.4.2      ✔ tailor       0.1.0 
+    ## ✔ dplyr        1.2.0      ✔ tidyr        1.3.2 
+    ## ✔ infer        1.1.0      ✔ tune         2.0.1 
+    ## ✔ modeldata    1.5.1      ✔ workflows    1.3.0 
+    ## ✔ parsnip      1.4.1      ✔ workflowsets 1.1.1 
+    ## ✔ purrr        1.2.1      ✔ yardstick    1.3.2 
+    ## ✔ recipes      1.3.1
+
+    ## ── Conflicts ───────────────────────────────────────── tidymodels_conflicts() ──
+    ## ✖ purrr::discard() masks scales::discard()
+    ## ✖ dplyr::filter()  masks stats::filter()
+    ## ✖ dplyr::lag()     masks stats::lag()
+    ## ✖ recipes::step()  masks stats::step()
+
+``` r
+library(pROC) # Still used for certain ROC visualizations
+```
+
+``` r
+# 1. Data Splitting
+set.seed(1234)
+
+# Convert 'admit' to a factor with descriptive labels for clarity
+admissions$admit <- factor(admissions$admit, 
+                           levels = c(0, 1), 
+                           labels = c("Rejected", "Admitted"))
+
+# Now proceed with data split
+# create_initial_split ensures the proportion of 'admit' is similar in both sets
+set.seed(1234)
+data_split <- initial_split(admissions, prop = 0.70, strata = admit)
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+```
+
+``` r
+# 2. Recipe (Preprocessing)
+# We tell R that 'admit' is the outcome and everything else is a predictor
+admin_recipe <- recipe(admit ~ ., data = train_data) %>%
+  step_dummy(all_nominal_predictors()) %>% # Automatically creates dummy variables for factors
+  step_zv(all_predictors())               # Removes variables with zero variance which are like same value in all rows
+```
+
+``` r
+# 3. Model Specification
+# Define the "What" and the "How"
+lr_spec <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+```
+
+``` r
+# 4. Create the Workflow
+# This "packages" the recipe and the model together
+admin_wflow <- workflow() %>%
+  add_recipe(admin_recipe) %>%
+  add_model(lr_spec)
+```
+
+``` r
+# 5. Model Training (The "Fit")
+admin_fit <- admin_wflow %>%
+  fit(data = train_data)
+```
+
+``` r
+# 6. Prediction and Evaluation
+# Collect predictions on the test set
+results <- test_data %>%
+  select(admit) %>%
+  bind_cols(predict(admin_fit, test_data, type = "prob")) %>%
+  bind_cols(predict(admin_fit, test_data, type = "class"))
+```
+
+``` r
+# 7. Metrics (The "Leaderboard")
+# accuracy and kap use the 'estimate' (the class)
+# roc_auc uses the '.pred_Admitted' (the probability)
+admission_metrics <- metric_set(yardstick::accuracy, 
+                                yardstick::kap, 
+                                yardstick::roc_auc)
+
+# Calculate the metrics
+metrics_results <- results %>%
+  admission_metrics(truth = admit, 
+                    estimate = .pred_class, 
+                    .pred_Admitted,
+                    event_level = "second")
+
+print(metrics_results)
+```
+
+    ## # A tibble: 3 × 3
+    ##   .metric  .estimator .estimate
+    ##   <chr>    <chr>          <dbl>
+    ## 1 accuracy binary         0.694
+    ## 2 kap      binary         0.210
+    ## 3 roc_auc  binary         0.629
+
+``` r
+# 8. ROC Curve Visualization
+#results %>%
+#  roc_curve(truth = admit, .pred_Admitted) %>%
+#  autoplot()
+```
+
+``` r
+# We use results$admit as the truth and results$.pred_Admitted as the probability
+roc_obj <- roc(results$admit, results$.pred_Admitted, percent = TRUE)
+```
+
+    ## Setting levels: control = Rejected, case = Admitted
+
+    ## Setting direction: controls < cases
+
+``` r
+# 2. Plot with Specificity on the X-Axis and custom colors
+plot.roc(roc_obj, 
+         legacy.axes = FALSE,      # This shows Specificity instead of 1-Specificity
+         print.auc = TRUE, 
+         grid = c(10, 10),         # Adds the grid lines
+         auc.polygon = TRUE, 
+         auc.polygon.col = "lightgreen", 
+         max.auc.polygon = TRUE,
+         print.thres = TRUE,       # Displays the 'best' threshold point
+         print.thres.adj = c(-1.5, 1.5),
+         grid.col = c("green", "red"),
+         main = "ROC Curve: Admissions Model")
+```
+
+![](01_Predictive_Analytics_Classification_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+
+## Expanding Your Modeling Toolkit
+
+To broaden the scope of your predictive modeling skills, exploring a
+variety of algorithms is essential. Below are the most important models
+to explore, categorized by task type.
+
+### 1. Regression Models (Predicting Continuous Values)
+
+Beyond standard Linear, Ridge, and Lasso regression, these models handle
+non-linear relationships and complex interactions more effectively.
+
+#### Random Forest Regression (`rand_forest`)
+
+- **Concept**: An ensemble method that builds multiple decision trees
+  and averages their predictions. It is excellent for handling outliers
+  and non-linear data without requiring scaling.
+- **Implementation**: Use the `ranger` engine.
+
+#### Boosted Trees (XGBoost/LightGBM) (`boost_tree`)
+
+- **Concept**: Like Random Forest, but builds trees sequentially, where
+  each new tree corrects the errors of the previous ones. This is
+  currently the “gold standard” for winning data science competitions.
+- **Implementation**: Use the `xgboost` engine.
+
+#### K-Nearest Neighbors (KNN) (`nearest_neighbor`)
+
+- **Concept**: Predicts the value of a data point by averaging the
+  values of the “K” most similar points in the training set.
+- **Note**: Requires `step_normalize()` in the recipe, as it is
+  distance-based.
+
+### 2. Classification Models (Predicting Categories)
+
+While Logistic Regression is the baseline, these models often provide
+higher accuracy for complex datasets like the stock market movement
+prediction.
+
+#### Random Forest Classification (`rand_forest`)
+
+- **Concept**: Instead of averaging (like in regression), the trees
+  “vote” on the final class. It is highly robust against overfitting.
+
+#### Naïve Bayes (`naive_Bayes`)
+
+- **Concept**: Based on Bayes’ Theorem, it assumes predictors are
+  independent. It is incredibly fast and works surprisingly well for
+  text classification and high-dimensional data.
+- **Implementation**: Use the `discrim` library engine.
+
+#### Support Vector Machines (SVM) (`svm_rbf`)
+
+- **Concept**: Finds the “widest street” (margin) between classes. The
+  Radial Basis Function (RBF) kernel is particularly good at finding
+  circular or complex boundaries.
+
+#### Decision Trees (`decision_tree`)
+
+- **Concept**: A simple, highly interpretable model that splits data
+  into branches based on “if-then” logic. It is great for visualizing
+  the “rules” the model uses to make a choice.
